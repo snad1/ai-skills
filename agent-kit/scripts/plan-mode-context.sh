@@ -18,5 +18,8 @@ Plan as a senior architect / security engineer. Specifically:
   testing rules (W-02 tests-with-features, Q-10 testing env, and any stack rule such as
   M-FL-12 for Flutter widgets). Omit only for typo / pure-style / asset changes - and
   say so explicitly in the plan.
+- Never plan a bare test-run step: any plan that runs tests, migrations, or seeders
+  must fold in the W-05 test-env preflight (a testing env exists AND names a database
+  distinct from the dev one), and must stop and ask when the repo has no testing env.
 - Surface in the plan which .claude/rules.md rules the change must satisfy.
 EOF

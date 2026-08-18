@@ -262,7 +262,7 @@ After bootstrap, you (and the dev team) can edit this file freely to add project
 **Status:** ACTIVE
 **Why:** Test side-effects (DB writes, email sends, file uploads) must not pollute dev or prod data.
 **Detect:** test scripts in `package.json` / `pubspec.yaml` / `pyproject.toml` / `composer.json` / `Makefile` that don't pass `NODE_ENV=testing` / `--env=testing` / `--dart-define=ENV=testing` / `APP_ENV=testing` / etc. Tests that read `process.env.DATABASE_URL` directly without env-switching first.
-**Fix:** test commands look like `NODE_ENV=testing pnpm test`, `APP_ENV=testing phpunit`, `flutter test --dart-define=ENV=testing`. Test bootstrap loads `.env.testing` (not `.env` or `.env.development`).
+**Fix:** test commands look like `NODE_ENV=testing pnpm test`, `APP_ENV=testing phpunit`, `flutter test --dart-define=ENV=testing`. Test bootstrap loads `.env.testing` (not `.env` or `.env.development`). This covers committed scripts; for the agent's own act of running a test, migration, or seeder command, W-05 adds the blocking preflight.
 
 ### Q-11 — Reuse before create (search first, extract components, understand before writing)
 **Status:** ACTIVE (advisory — semantic, enforced by `/x-implement` and code review)
@@ -393,6 +393,55 @@ for f in sys.argv[1:]:
   - Test fixtures
 **Fix:** add the key to every locale file simultaneously (never ship a key with only one locale), consume via the project's translation function, and keep keys organized by feature (`auth.signInWithGoogle`, `home.greeting`, not flat `signInWithGoogleBtn`).
 **When i18n infra does NOT exist:** this rule is INACTIVE. Do not force i18n on a single-locale project just because the kit has the rule.
+
+---
+
+### W-05 — Never run a test suite without a verified testing environment
+**Status:** ACTIVE (BLOCKING — applies to the agent's own commands, not just committed scripts)
+**Why:** Q-10 governs the test scripts committed in a repo. This rule governs the moment an agent
+*executes* one. A bare `php artisan test` / `pnpm test` / `pytest` loads whatever env the repo loads
+by default (`.env`, `.env.local`) which points at the real development database. A suite using
+`RefreshDatabase`, or any `migrate:fresh`, then drops every table in it. Losing a developer's local
+data to a "quick test run" is unrecoverable and always avoidable.
+**Detect:** any command about to run tests, migrations, or seeders in a repo where the testing
+environment has not been verified in this session. Also: a testing env that exists but points at the
+same database as the dev env.
+**Fix — run this preflight before the command, every time:**
+
+**A. Does the run touch shared state?** Flutter widget/unit tests, `dart test`, vitest/jest component
+tests with no DB client, and pure unit tests do not. Run them with the explicit env flag and continue.
+
+**B. For anything that touches a database, verify all three:**
+  1. **A testing env source exists** — `.env.testing`, `.env.test`, `phpunit.xml` with
+     `<env name="APP_ENV" value="testing"/>`, `pytest.ini` / `tox.ini` test settings module,
+     a vitest/jest `env` config block, or `docker-compose.test.yml`.
+  2. **It names a distinct database** — the test `DB_DATABASE` / `DATABASE_URL` differs from the dev
+     and prod one, or is sqlite `:memory:`. A testing env pointing at the dev database FAILS.
+  3. **The command carries the explicit env flag** — `APP_ENV=testing`, `--env=testing`,
+     `NODE_ENV=testing`, `--dart-define=ENV=testing`.
+
+**C. If any check fails, DO NOT RUN.** Stop and report, naming the file and the database:
+
+```
+⚠ Test-env preflight FAILED — <repo>
+  • No .env.testing found (checked .env.testing, .env.test, phpunit.xml)
+  • `php artisan test` would load <repo>/.env → DB `app_local`
+  • The suite uses RefreshDatabase, which DROPS every table in that database
+
+Tests NOT run. Choose:
+  (a) I create <repo>/.env.testing from .env.example pointing at `app_test`
+      (you create the database)
+  (b) You point me at an existing testing env file
+  (c) Run against the real database — reply exactly: run anyway against app_local
+```
+
+**D. Hard limits, never overridden:**
+  - Never auto-create a testing env file. Option (a) is offered, never taken unprompted.
+  - Consent under (c) requires the user to echo the database name, applies to that one invocation,
+    and is never remembered across turns or sessions.
+  - `migrate:fresh`, `db:wipe`, `prisma migrate reset` stay blocked outside a verified testing env
+    even under (c), unless the user names the database in that same reply.
+  - Any report that mentions tests states which env they ran under, or that none ran and why.
 
 ---
 

@@ -202,6 +202,7 @@ ALWAYS list these explicitly, so the user can see the skill is enforcing them:
 - [ ] [Specific testable criterion 2]
 - [ ] Matching test file(s) exist for each new unit of behavior (W-02 + M-FL-12) — OR `--no-tests` was explicitly passed and justified
 - [ ] Tests run via the project's testing env (Q-10): `NODE_ENV=testing` / `APP_ENV=testing` / `flutter test --dart-define=ENV=testing` / etc.
+- [ ] Test-env preflight passed (W-05): a testing env exists and names a database distinct from the dev one - OR the user explicitly authorized the target database by name
 - [ ] All affected files pass `/x-check`
 
 ### What I'll do in Phase 1
@@ -277,6 +278,52 @@ If `--no-tests` was passed: state in the report WHY tests are deferred (e.g. "pu
 
 NOT acceptable reasons: "it's simple", "I'll add them later", "the user didn't ask for tests". The user asking for a feature implies asking for a working + tested feature.
 
+### Step 1.5.1 — Test-env preflight (BLOCKING, before any test command)
+
+Rule W-05. Running tests is where an agent destroys a developer's data: a bare `php artisan test`
+/ `pnpm test` / `pytest` loads the repo's default env (`.env`, `.env.local`), which points at the
+real development database, and a `RefreshDatabase` suite drops every table in it. This step runs
+BEFORE Step 1.6 executes anything, and it can stop the run.
+
+**A. Does the run touch shared state?** Flutter widget/unit tests, `dart test`, vitest/jest component
+tests with no DB client, and pure unit tests do not. Run them with the explicit env flag, note it in
+the report, and continue to Step 1.6.
+
+**B. For anything DB-touching, verify all three before running:**
+1. **A testing env source exists** — `.env.testing`, `.env.test`, `phpunit.xml` with
+   `<env name="APP_ENV" value="testing"/>`, `pytest.ini` / `tox.ini` test settings, a vitest/jest
+   `env` config block, or `docker-compose.test.yml`.
+2. **It names a distinct database** — the test `DB_DATABASE` / `DATABASE_URL` differs from the dev
+   and prod one, or is sqlite `:memory:`. A testing env pointing at the dev database FAILS this check.
+3. **The command carries the explicit env flag** — `APP_ENV=testing`, `--env=testing`,
+   `NODE_ENV=testing`, `--dart-define=ENV=testing`.
+
+**C. If any check fails: DO NOT RUN THE TESTS.** Stop, run nothing, and report — naming the exact env
+file that would load and the exact database it points at:
+
+```
+⚠ Test-env preflight FAILED — <repo>
+  • No .env.testing found (checked .env.testing, .env.test, phpunit.xml)
+  • `php artisan test` would load <repo>/.env → DB `app_local`
+  • The suite uses RefreshDatabase, which DROPS every table in that database
+
+Tests NOT run. Choose:
+  (a) I create <repo>/.env.testing from .env.example pointing at `app_test`
+      (you create the database)
+  (b) You point me at an existing testing env file
+  (c) Run against the real database — reply exactly: run anyway against app_local
+```
+
+Then finish everything else in the task (implementation, Step 1.7, Phase 2) and hand back the report
+with the preflight failure at the top. A failed preflight blocks the test run, not the work.
+
+**D. Hard limits, never overridden:**
+- Never auto-create a testing env file. Option (a) is offered, never taken unprompted.
+- Consent under (c) requires the user to echo the database name, applies to that one invocation, and
+  is never remembered across turns or sessions.
+- `migrate:fresh`, `db:wipe`, `prisma migrate reset` stay blocked outside a verified testing env even
+  under (c), unless the user names the database in that same reply.
+
 ### Step 1.6 — Smoke test
 
 For non-trivial changes, run a fast type-check or lint via Bash if the repo has one. Pick the appropriate command per stack (examples — use what the detected repo actually supports):
@@ -284,7 +331,7 @@ For non-trivial changes, run a fast type-check or lint via Bash if the repo has 
 - Flutter: `cd <repo> && flutter analyze --no-fatal-infos 2>&1 | tail -20`
 - PHP/Laravel: `cd <repo> && ./vendor/bin/phpstan analyse 2>&1 | tail -20` (if configured)
 
-Fix any type errors introduced by your changes before proceeding. If tests were added in Step 1.5, also run them: `flutter test --dart-define=ENV=testing <path>` / `pnpm test <path>` / etc.
+Fix any type errors introduced by your changes before proceeding. If tests were added in Step 1.5, run them ONLY after Step 1.5.1's preflight passed, and always with the explicit env flag: `flutter test --dart-define=ENV=testing <path>` / `NODE_ENV=testing pnpm test <path>` / `APP_ENV=testing php artisan test <path>`. If the preflight failed, do not run them - report the failure instead.
 
 ### Step 1.7 — Inline-comment self-audit (MANDATORY before Phase 2)
 
@@ -395,6 +442,7 @@ Output:
 **Violations auto-fixed**: <count>
 **Violations reported (need decision)**: <count>
 **Q-13 chars stripped**: <count> (em-dash, en-dash, ellipsis, smart quotes, zero-width, BOM, `&mdash;`/`&ndash;`/`&hellip;` entities)
+**Tests run under**: <env flag + database, e.g. `APP_ENV=testing` -> `app_test`> (or: not run - preflight failed, see above)
 
 #### ✅ Auto-fixed (N)
 | Rule | File | Fix applied |
