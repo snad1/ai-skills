@@ -91,9 +91,31 @@ Uses [claude-init.sh](claude-kit/claude-init.sh) and writes `CLAUDE.md` + `.clau
 
 Full tables in [agent-kit/README.md](agent-kit/README.md) and [claude-kit/README.md](claude-kit/README.md).
 
+## Versions (single source of truth)
+
+Read a version from this table and nowhere else. Everything here is bumped together.
+
+| Component | Version | Notes |
+|---|---|---|
+| `PROMPT_GENERATOR.md` | 3.0 | detect-first edition; `STEP 1`-`STEP 5` anchors are referenced by `/x-implement` |
+| agent-kit | 1.1 | source of truth for rules, skills, templates, shared scripts |
+| claude-kit | 1.2 | mirror of agent-kit's shared assets; own installer and hooks |
+| rules baseline | 1.1 | universal rules; stack modules appended per project |
+
+`agent-kit` owns the shared assets. `claude-kit` receives them:
+
+```bash
+bash /Users/mac/Projects/.ai/agent-kit/kit-sync.sh           # mirror agent-kit -> claude-kit
+bash /Users/mac/Projects/.ai/agent-kit/kit-sync.sh --check   # exits 1 if the two have drifted
+```
+
+Edit `agent-kit/`, then mirror. Editing `claude-kit/rules|skills|templates` directly gets
+overwritten on the next mirror.
+
 ## After bootstrap
 
 ```bash
+bash /Users/mac/Projects/.ai/agent-kit/scripts/repair-sentinel.sh <project>   # ALWAYS run before a first sync
 bash /Users/mac/Projects/.ai/agent-kit/agent-sync.sh <project>   # propagate kit updates (keeps project-added rules)
 bash <project>/.agents/scripts/install-hooks.sh all              # redeploy the pre-commit hook
 bash <project>/.agents/scripts/install-workflows.sh all          # restage the CI workflow
@@ -110,4 +132,22 @@ Commit, push, modify your source code, run tests, install dependencies, configur
 
 ---
 
-**Updated:** 2026-08-16 · agent-kit v1.0 · claude-kit v1.1
+### Before the first sync of an older project
+
+`agent-sync.sh` / `claude-sync.sh` rebuild `rules.md` from the kit and preserve only what sits
+below the sentinel. A project bootstrapped before the sentinel existed will lose every rule it
+added. Run the repair first:
+
+```bash
+bash agent-kit/scripts/repair-sentinel.sh <project>            # report only, writes nothing
+bash agent-kit/scripts/repair-sentinel.sh <project> --apply    # moves project rules below the sentinel
+```
+
+It classifies each rule as kit-identical, kit-modified, or project-only. A kit rule that was edited
+in place stops the run with exit 2 rather than being silently reverted; pass `--force-keep-project`
+to keep the project's version. `--apply` always writes `rules.md.bak-<ts>` inside the project first,
+which is the only rollback for the projects that are not git repos.
+
+---
+
+**Updated:** 2026-08-18 · agent-kit v1.1 · claude-kit v1.2 · PROMPT_GENERATOR v3.0

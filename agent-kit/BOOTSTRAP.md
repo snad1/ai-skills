@@ -101,6 +101,22 @@ Then, for **claude/all** targets only, generate `CLAUDE.md` from `agent-kit/temp
 5. **Final report** (files created, hooks installed, CI staged, next steps, audit highlights).
 6. Append `**Bootstrapped:** <date> (target: <T>)` to `MEMORY.md`.
 
+#### Required outcomes
+
+Every item is observable. The bootstrap isn't done until each is true. Verify, don't assume.
+
+- [ ] The user explicitly confirmed the working directory in Phase 0
+- [ ] Every Phase 2 question was asked ONE at a time, and every answer is in the memory folder
+- [ ] `rules.md` exists, ends with the sentinel `<!-- kit-managed above — project rules below -->`, and its rule count is greater than the baseline's
+- [ ] Every detected stack has its rules module appended, and every appended module matches a stack that actually exists in the project
+- [ ] All 7 skills are present under the target's skills dir and contain no literal `{{TOKEN}}` text
+- [ ] The anchor file (`AGENTS.md` and/or `CLAUDE.md`) exists and carries the cloned memory block
+- [ ] The pre-commit hook is installed AND was smoke-tested against one staged file
+- [ ] `x-check.yml` is staged alongside existing workflows, not over them
+- [ ] The plan-mode hook is registered for every active target
+- [ ] `audits/<repo>/` holds one line-by-line audit per detected repo, or the skip reason is stated
+- [ ] Nothing was committed, and no source file was modified
+
 ---
 
 ## Constraints (hard rules)
@@ -115,6 +131,8 @@ Then, for **claude/all** targets only, generate `CLAUDE.md` from `agent-kit/temp
 - **Do use the kit's templates** — don't reinvent the rules file or anchor format.
 - **Do clone memory into `AGENTS.md`** (Phase 5) — that's the whole point of the multi-agent kit.
 - **Do save user answers to memory immediately** as collected in Phase 2.
+- **Do not overwrite an existing `rules.md` that has no sentinel.** Its project rules live above the line the sync preserves, so a rebuild discards them. Run `scripts/repair-sentinel.sh <project>` first, read the report, then sync.
+- **Do not delete the in-project `rules.md.bak-<ts>`** a repair or sync writes. For a project without git it is the only rollback.
 
 ---
 
@@ -153,5 +171,5 @@ Mostly idempotent. If a phase fails: Phases 1-2 just re-ask; Phase 3 restart the
 
 ---
 
-**Kit version:** 1.0
+**Kit version:** 1.1
 **Last updated:** 2026-07-25

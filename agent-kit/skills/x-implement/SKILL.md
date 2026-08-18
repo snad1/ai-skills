@@ -7,6 +7,8 @@ allowed-tools: [Read, Edit, Write, Glob, Grep, Bash]
 
 # /x-implement — The {{PROJECT_NAME}} canonical work command
 
+<!-- kit: agent-kit v1.1 · PROMPT_GENERATOR v3.0 -->
+
 You are doing work in the {{PROJECT_NAME}} project. This is the **single canonical entry point** for any non-trivial coding task. It runs in **3 phases**:
 
 | Phase | What happens | Skip flag |
@@ -105,6 +107,18 @@ For each affected repo, look up:
   **If i18n is NOT configured** and the user is ADDING multilingual support: treat it as a foundational scope-expansion — stop and confirm scope with the user before proceeding (it touches `MaterialApp`, `pubspec.yaml`, and every screen with user-facing text).
 
 ### Step 0.4 — Score ambiguity (OPINIONATED — this controls whether to ask questions)
+
+**Detect before you ask.** An axis scores 3 when *detection* can answer it, even if the user never said it. Run the search first, then score. Scoring an axis low because the user didn't spell something out, when one `Grep` would have settled it, is the most common failure of this step and costs the user a round trip.
+
+| Don't ask | Detect it |
+|---|---|
+| "Which framework / test runner?" | Manifest + lockfile: `package.json` scripts, `phpunit.xml`, `pytest.ini`, `pubspec.yaml` |
+| "Where should this file go?" | The directory holding the nearest sibling of the same kind |
+| "What naming convention?" | Read 3 existing files in that directory |
+| "Which version of X?" | The lockfile. Never guess a version number |
+| "Do you want tests?" | Yes (W-02). Asking for a feature is asking for a working, tested feature |
+| "Should I follow SOLID / handle errors / consider security?" | Always yes. Defaults, not options |
+| "Is this project multilingual?" | Step 0.3's i18n detection already answered it |
 
 Score the parsed task on 4 axes. **If ANY axis is below threshold, ask a question about THAT specific axis.** Don't ask vague questions.
 
@@ -462,6 +476,40 @@ Output:
 - [ ] Run the smoke test command
 - [ ] Commit when ready
 ```
+
+### Step 2.7 — Required outcomes (verify before you hand back)
+
+Every item is observable. The run isn't finished until each is true, or the report states which one was waived and why. Don't paraphrase this list in the report; check it.
+
+- [ ] Every phase ran, or the report names the flag that skipped it
+- [ ] Fewer than 4 questions were asked in Phase 0, and none had an answer sitting in the repo
+- [ ] Existing code was searched (Q-11) before any new helper, component, or service was written
+- [ ] Every file changed is named in the report with what changed and why
+- [ ] Every rule in the contract's "Rules that will apply" table was checked against the diff
+- [ ] New behavior has a matching test file, or `--no-tests` was passed AND the reason is stated
+- [ ] Tests ran with an explicit env flag, and the report names the env and the database
+- [ ] Or: the W-05 preflight failed, tests were NOT run, and the failure is at the top of the report
+- [ ] Q-12 scan ran: no new inline comment paraphrases the line beneath it
+- [ ] Q-13 scan ran: the report carries the hit count, and it is 0
+- [ ] Frontend changes name the LCP element and confirm it paints without an entrance animation
+- [ ] Nothing outside the scope contract was modified
+
+### Step 2.8 — Troubleshooting: symptom to root cause
+
+When a run goes wrong, find the symptom here rather than re-deriving the cause.
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| Phase 2 flagged a new inline block comment | Step 1.7 was skipped | Run Step 1.7 on the diff before Phase 2, not after. Treat it as a process bug |
+| The diff touched files nobody agreed to | Step 1.4 was not honored | Revert the out-of-scope edits, then re-negotiate. Silent widening is the #1 failure mode |
+| A question was asked that `Grep` could answer | Step 0.4 was scored before detection ran | Score axes only after Step 0.3's searches |
+| 4+ questions were asked | The task was too vague, but got a questionnaire | Stop and say the task needs detail. Name what is missing |
+| Tests were written but never run | The W-05 preflight failed and the run was skipped quietly | Put the preflight failure at the TOP of the report, with the env file and database it would have loaded |
+| A test run wiped development data | The suite loaded the default env, pointing at the dev database | Never run without naming the env file and database first. `--env=testing` is not optional |
+| Project rules vanished after a kit sync | `rules.md` had no sentinel, so the sync rebuilt it from the kit | Run `repair-sentinel.sh <project>` before syncing. Keep the in-project `.bak-<ts>` |
+| The plan-mode hook didn't fire | The hook isn't registered for this target in the agent's settings | Re-run `install-plan-hook.sh <project> <target>` |
+| The report says done, but the feature doesn't work | Completion was inferred from edits, not verified | Run it. Report actual output, failures included |
+| A user saw raw SQL or a stack trace | A new error path shipped without env gating (S-13) | Gate the detail on the environment; plain message in production |
 
 ---
 

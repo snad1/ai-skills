@@ -4,7 +4,9 @@
 
 After bootstrap, you (and the dev team) can edit this file freely to add project-specific rules. The skills (`/x-rules`, `/x-check`, `/x-implement`) read whatever is in `<project>/.claude/rules.md` — they don't care which rules came from the baseline vs the stack modules vs your additions.
 
-**Last updated:** 2026-04-09 (kit version 1.0)
+**Kit version:** agent-kit v1.1 (mirrored to claude-kit v1.2) · **Last updated:** 2026-08-18
+
+Version numbers for the kit, the skills, and `PROMPT_GENERATOR.md` are pinned in one place: `/Users/mac/Projects/.ai/README.md`. Do not read a version from anywhere else.
 
 ---
 

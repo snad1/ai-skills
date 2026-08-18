@@ -82,29 +82,7 @@ printf "  ${GREEN}✓${NC} templates/audit-prompt.md\n\n"
 RULES_TARGET="$TARGET/.claude/rules.md"
 
 # Detect stacks (same logic as init, simplified — reads what the project has)
-detect_stacks() {
-    local d=()
-    if find "$TARGET" -maxdepth 4 -name "nest-cli.json" 2>/dev/null | head -1 | grep -q .; then d+=("backend-nestjs"); fi
-    if find "$TARGET" -maxdepth 4 -name "next.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q .; then d+=("frontend-next"); fi
-    if find "$TARGET" -maxdepth 4 -name "nuxt.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q .; then d+=("frontend-nuxt"); fi
-    # Generic React (Vite/CRA, NOT Next which already covers React): vite.config
-    # present, a react dep in some package.json, and no next/nuxt detected.
-    if find "$TARGET" -maxdepth 4 -name "vite.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q . \
-       && find "$TARGET" -maxdepth 4 -name "package.json" -not -path "*/node_modules/*" -exec grep -l '"react"' {} \; 2>/dev/null | head -1 | grep -q . \
-       && ! find "$TARGET" -maxdepth 4 -name "next.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q . \
-       && ! find "$TARGET" -maxdepth 4 -name "nuxt.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q .; then d+=("frontend-react"); fi
-    # Generic Vue (Vite, NOT Nuxt which already covers Vue): vite.config present,
-    # a vue dep in some package.json, and no nuxt detected.
-    if find "$TARGET" -maxdepth 4 -name "vite.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q . \
-       && find "$TARGET" -maxdepth 4 -name "package.json" -not -path "*/node_modules/*" -exec grep -l '"vue"' {} \; 2>/dev/null | head -1 | grep -q . \
-       && ! find "$TARGET" -maxdepth 4 -name "nuxt.config.*" -not -path "*/node_modules/*" 2>/dev/null | head -1 | grep -q .; then d+=("frontend-vue"); fi
-    if find "$TARGET" -maxdepth 3 -name "artisan" 2>/dev/null | head -1 | grep -q .; then d+=("backend-laravel"); fi
-    if find "$TARGET" -maxdepth 3 -name "manage.py" 2>/dev/null | head -1 | grep -q .; then d+=("backend-django"); fi
-    if find "$TARGET" -maxdepth 3 -name "pubspec.yaml" 2>/dev/null | head -1 | grep -q .; then d+=("mobile-flutter"); fi
-    if find "$TARGET" -maxdepth 3 -name "metro.config.*" 2>/dev/null | head -1 | grep -q .; then d+=("mobile-react-native"); fi
-    if [ ${#d[@]} -eq 0 ]; then return 0; fi
-    printf "%s\n" "${d[@]}" | sort -u
-}
+. "$KIT_DIR/scripts/_detect_stacks.sh"
 STACKS="$(detect_stacks)"
 
 printf "${BOLD}Rebuilding rules.md...${NC}\n"
